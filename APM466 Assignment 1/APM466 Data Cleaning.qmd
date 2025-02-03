@@ -1,0 +1,79 @@
+---
+title: "APM466 Assignment 1"
+format: pdf
+---
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+
+# Load the CSV file
+bond_data <- read.csv("Selected Bonds.csv")
+
+# Map column names to actual dates
+date_mapping <- c(
+  "jan_6" = "2025-01-06",
+  "jan_7" = "2025-01-07",
+  "jan_8" = "2025-01-08",
+  "jan_9" = "2025-01-09",
+  "jan_10" = "2025-01-10",
+  "jan_13" = "2025-01-13",
+  "jan_14" = "2025-01-14",
+  "jan_15" = "2025-01-15",
+  "jan_16" = "2025-01-16",
+  "jan_17" = "2025-01-17"
+)
+
+# Convert coupon_rate to numeric
+bond_data <- bond_data |>
+  mutate(coupon_rate = as.numeric(coupon_rate))
+
+# Define face value (FV)
+face_value <- 100
+
+# Define a function to calculate dirty price
+calculate_dirty_price <- function(clean_price, coupon_rate, column_name, last_coupon_date, face_value) {
+  # Get the pricing date from the column name
+  current_date <- as.Date(date_mapping[column_name])
+  
+  # Calculate days since the last coupon
+  days_since_last_coupon <- as.numeric(current_date - as.Date(last_coupon_date))
+  
+  # Calculate accrued interest
+  accrued_interest <- face_value * (coupon_rate / 2) * (days_since_last_coupon / 182.5)
+  
+  # Calculate dirty price
+  dirty_price <- clean_price + accrued_interest
+  return(dirty_price)
+}
+
+# Iterate through jan_* columns and calculate dirty prices
+for (col in names(date_mapping)) {
+  bond_data[[paste0(col, "_dirty")]] <- mapply(
+    calculate_dirty_price,
+    clean_price = bond_data[[col]],
+    coupon_rate = bond_data$coupon_rate,
+    column_name = col,
+    last_coupon_date = bond_data$last_coupon_date,
+    MoreArgs = list(face_value = face_value)
+  )
+}
+
+# Remove unnecessary columns (e.g., X, X.1)
+bond_data <- bond_data |>
+  select(-starts_with("X"))
+
+# Round all price-related columns to 2 decimal places
+bond_data <- bond_data |>
+  mutate(across(
+    where(is.numeric) & !all_of("coupon_rate"),  # Exclude coupon_rate
+    ~ round(., 2)
+  ))
+
+# Save the final cleaned and rounded dataset to a CSV
+write.csv(bond_data, "Final_Bond_Data.csv", row.names = FALSE)
+
+# View the first few rows of the final dataset
+head(bond_data)
+```
